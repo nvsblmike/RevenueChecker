@@ -1,40 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# RevenueCheck by t-Consult
 
-## Getting Started
+A focused SME revenue-leakage assessment built with Next.js, Clerk and FastAPI.
 
-First, run the development server:
+## One-time setup
+
+```bash
+npm install
+cp .env.example .env.local
+```
+
+Replace the Clerk placeholders in `.env.local` with keys from your Clerk
+dashboard. Next.js loads `.env.local` automatically. Never commit it.
+
+Also add your `OPENAI_API_KEY`, `OPENAI_MODEL` and Clerk `CLERK_JWKS_URL`. The
+Python API loads this same local environment file; keys remain server-side.
+
+## Database and report email
+
+RevenueCheck requires a PostgreSQL database. Create an empty database and set:
+
+```env
+DATABASE_URL=postgresql+psycopg://user:password@host:5432/revenuecheck?sslmode=require
+```
+
+FastAPI creates `app_users`, `assessments`, and `email_deliveries` on startup.
+The equivalent SQL is available in `api/schema.sql` if your provider requires
+manual migrations.
+
+To email completed, consented assessments to t-Consult, configure Resend:
+
+```env
+RESEND_API_KEY=re_replace_me
+RESEND_FROM_EMAIL=RevenueCheck <reports@your-verified-domain.com>
+REPORT_RECIPIENT_EMAIL=alesemichael641@gmail.com
+```
+
+The API saves the assessment before returning it. Email is sent in a background
+task, and every delivery attempt is recorded as `sent` or `failed` so an email
+outage does not lose the report.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r api/requirements.txt
+```
+
+## Run locally
+
+Terminal 1 — FastAPI:
+
+```bash
+source .venv/bin/activate
+uvicorn api.index:app --reload --port 8000
+```
+
+Terminal 2 — Next.js:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. In development, Next.js proxies `/api` to
+`http://127.0.0.1:8000/api`, so the frontend uses the same URL locally and on
+Vercel.
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+- Frontend: http://localhost:3000
+- API health check: http://localhost:8000/api
+- Interactive API docs: http://localhost:8000/docs
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+## Clerk keys
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
-
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+`ClerkProvider` receives `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` in
+`pages/_app.tsx`. Clerk's server-side utilities read `CLERK_SECRET_KEY`
+automatically when needed. Never pass the secret key to React or expose it with
+a `NEXT_PUBLIC_` prefix.
+# RevenueChecker
