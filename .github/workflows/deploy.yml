@@ -47,7 +47,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - id: image
         run: echo "ref=${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
@@ -68,6 +68,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-24.04
+    environment: production
     steps:
       - uses: actions/checkout@v4
       - name: Configure SSH
@@ -118,17 +119,50 @@ jobs:
           } > .deploy-runtime/.env
 
       - name: Transfer deployment files
+        shell: bash
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
+          set -Eeuo pipefail
+
           port="${SERVER_SSH_PORT:-22}"
           path="${DEPLOY_PATH:-/opt/revenuecheck}"
-          ssh -p "$port" "$SERVER_USER@$SERVER_HOST" "mkdir -p '$path'"
-          scp -P "$port" deploy/docker-compose.yml "$SERVER_USER@$SERVER_HOST:$path/docker-compose.yml"
-          scp -P "$port" .deploy-runtime/.env "$SERVER_USER@$SERVER_HOST:$path/.env.deploy"
+
+          [[ -n "$SERVER_HOST" ]] || {
+            echo "::error::SERVER_HOST is missing"
+            exit 1
+          }
+
+          [[ -n "$SERVER_USER" ]] || {
+            echo "::error::SERVER_USER is missing"
+            exit 1
+          }
+
+          [[ "$port" =~ ^[0-9]+$ ]] || {
+            echo "::error::SERVER_SSH_PORT must contain only a number such as 22"
+            exit 1
+          }
+
+          [[ "$path" == /* ]] || {
+            echo "::error::DEPLOY_PATH must be an absolute path"
+            exit 1
+          }
+
+          ssh -p "$port" \
+            "${SERVER_USER}@${SERVER_HOST}" \
+            "mkdir -p '$path'"
+
+          scp -P "$port" \
+            deploy/docker-compose.yml \
+            "${SERVER_USER}@${SERVER_HOST}:${path}/docker-compose.yml"
+
+          scp -P "$port" \
+            .deploy-runtime/.env \
+            "${SERVER_USER}@${SERVER_HOST}:${path}/.env.deploy"
+
           rm -rf .deploy-runtime
 
       - name: Deploy and verify
