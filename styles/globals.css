@@ -6,23 +6,23 @@
 @media(max-width:800px){header nav{display:none}.hero{grid-template-columns:1fr;padding-top:55px}.hero h1{font-size:49px}.visual{margin-top:30px;justify-content:center}.dashboard-card{width:min(440px,92vw)}.chip-one{right:0}.proof{height:auto;padding:30px;gap:20px;flex-direction:column}.proof div{flex-wrap:wrap;justify-content:center;gap:20px}.steps,.form-grid,.observation-grid,.area-grid,.result-grid,.result-summary,.plan-card{grid-template-columns:1fr}.result-intro{align-items:flex-start;gap:25px;flex-direction:column}.plan-card{gap:35px}.submit-row{align-items:stretch;flex-direction:column;gap:20px}.submit-row .button{width:100%}}@media(max-width:520px){header{height:70px;padding:0 18px}.header-actions>.text-button,.header-actions>div{display:none}.button-small{font-size:0;padding:11px}.button-small svg{display:block}.hero{padding:45px 20px}.hero h1{font-size:43px}.hero h2{font-size:22px}.hero-actions{align-items:flex-start;flex-direction:column}.visual{height:400px}.float-chip{display:none}.how{padding:70px 20px}.how h3{font-size:32px}.steps{grid-template-columns:1fr}.app-header{height:70px;padding:0 18px}.assessment,.results{padding:25px 15px 60px}.progress{margin-bottom:45px}.form-heading h1,.result-intro h1{font-size:34px}.form-card,.area-section{padding:23px 18px}.form-grid{gap:16px}.result-summary strong{font-size:29px}.plan-card{padding:28px 22px}.confidence{width:100%}.auth-gate>.brand{left:20px}.auth-gate h1{font-size:34px}}
 
 /* Slightly larger type across the product for easier reading. */
-body{font-size:17px;line-height:1.55}
-header nav a,.button-small{font-size:15px}
-.button-hero{font-size:17px}
-.eyebrow,.section-label{font-size:12px}
-.hero-copy>p{font-size:18px}
-.hero-actions>span,.dashboard-card>p,.form-section-title p,.app-header>span,.back{font-size:14px}
-.dash-head,.risk-row b,.proof span,.step p,.confidence b,.top-risk>p,.area-grid h3{font-size:15px}
-.live,.float-chip,.progress div,.form-section-title>span,.causes article>span{font-size:12px}
-.risk-row small,.recovery small,.impact,.recovery>span,.proof p{font-size:11px}
-.step h4,.form-section-title h2{font-size:19px}
-.form-heading>p{font-size:16px}
-.field>span,.submit-row>div,.consent b{font-size:13px}
-.field input,.field select,.field textarea{font-size:16px}
-.confidence small,.big-number>span,.recovery-panel>small,.card-kicker,.top-risk small,.causes article>b,.plan-copy>small,.timeline small,.area-status{font-size:11px}
-.big-number p,.recovery-panel p,.top-risk b,.causes h3,.plan-copy>p,.timeline h3,.area-grid p{font-size:14px}
-.causes p,.timeline p,.disclaimer p,.disclaimer summary,.disclaimer li,.area-grid small,.consent small{font-size:12px}
-.disclaimer>b{font-size:13px}
+body{font-size:18px;line-height:1.55}
+header nav a,.button-small{font-size:16px}
+.button-hero{font-size:18px}
+.eyebrow,.section-label{font-size:13px}
+.hero-copy>p{font-size:19px}
+.hero-actions>span,.dashboard-card>p,.form-section-title p,.app-header>span,.back{font-size:15px}
+.dash-head,.risk-row b,.proof span,.step p,.confidence b,.top-risk>p,.area-grid h3{font-size:16px}
+.live,.float-chip,.progress div,.form-section-title>span,.causes article>span{font-size:13px}
+.risk-row small,.recovery small,.impact,.recovery>span,.proof p{font-size:12px}
+.step h4,.form-section-title h2{font-size:20px}
+.form-heading>p{font-size:17px}
+.field>span,.submit-row>div,.consent b{font-size:14px}
+.field input,.field select,.field textarea{font-size:17px}
+.confidence small,.big-number>span,.recovery-panel>small,.card-kicker,.top-risk small,.causes article>b,.plan-copy>small,.timeline small,.area-status{font-size:12px}
+.big-number p,.recovery-panel p,.top-risk b,.causes h3,.plan-copy>p,.timeline h3,.area-grid p{font-size:15px}
+.causes p,.timeline p,.disclaimer p,.disclaimer summary,.disclaimer li,.area-grid small,.consent small{font-size:13px}
+.disclaimer>b{font-size:14px}
 
 @media(max-width:520px){
   .button-small{font-size:0}
