@@ -71,15 +71,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configure SSH
+        shell: bash
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
           SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT }}
         run: |
+          set -Eeuo pipefail
+
+          port="${SERVER_SSH_PORT:-22}"
+
+          [[ -n "$SERVER_HOST" ]] || {
+            echo "::error::SERVER_HOST is missing from the production environment"
+            exit 1
+          }
+
+          [[ "$SERVER_HOST" != *"://"* && "$SERVER_HOST" != *"@"* && "$SERVER_HOST" != *"/"* ]] || {
+            echo "::error::SERVER_HOST must be only a hostname or IP address"
+            exit 1
+          }
+
+          [[ "$port" =~ ^[0-9]+$ ]] || {
+            echo "::error::SERVER_SSH_PORT must contain only a number such as 22"
+            exit 1
+          }
+
+          [[ -n "$SERVER_SSH_KEY" ]] || {
+            echo "::error::SERVER_SSH_KEY is missing from the production environment"
+            exit 1
+          }
+
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SERVER_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "${SERVER_SSH_PORT:-22}" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+          if ! ssh-keygen -y -P '' -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
+            echo "::error::SERVER_SSH_KEY is not a valid unencrypted private key"
+            exit 1
+          fi
+
+          if ! ssh-keyscan -T 15 -p "$port" -H "$SERVER_HOST" > ~/.ssh/known_hosts 2>/dev/null; then
+            echo "::error::Cannot reach the SSH service. Check SERVER_HOST, SERVER_SSH_PORT, the server firewall, and whether sshd is running."
+            exit 1
+          fi
+
+          [[ -s ~/.ssh/known_hosts ]] || {
+            echo "::error::The SSH server returned no host key"
+            exit 1
+          }
 
       - name: Create protected runtime environment
         env:
