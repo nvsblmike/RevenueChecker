@@ -152,7 +152,7 @@ jobs:
 
           ssh -p "$port" \
             "${SERVER_USER}@${SERVER_HOST}" \
-            "mkdir -p '$path'"
+            "sudo mkdir -p '$path'"
 
           scp -P "$port" \
             deploy/docker-compose.yml \
@@ -162,7 +162,7 @@ jobs:
             .deploy-runtime/.env \
             "${SERVER_USER}@${SERVER_HOST}:${path}/.env.deploy"
 
-          rm -rf .deploy-runtime
+          sudo rm -rf .deploy-runtime
 
       - name: Deploy and verify
         env:
