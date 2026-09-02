@@ -184,6 +184,12 @@ jobs:
             sudo -n chmod 600 .env.deploy && sudo -n mv .env.deploy .env && \
             sudo -n docker compose config --quiet && \
             sudo -n docker compose pull && \
-            sudo -n docker compose up -d --remove-orphans && \
-            timeout 180 sh -c 'until curl --fail --silent http://127.0.0.1:3000/ >/dev/null && curl --fail --silent http://127.0.0.1:8000/api >/dev/null; do sleep 5; done' && \
+            if ! sudo -n docker compose up -d --remove-orphans --wait --wait-timeout 180; then \
+              echo '::error::Application did not become healthy within 180 seconds'; \
+              sudo -n docker compose ps; \
+              sudo -n docker compose logs --no-color --tail=200 app postgres; \
+              exit 1; \
+            fi && \
+            curl --fail --show-error --silent http://127.0.0.1:3000/ >/dev/null && \
+            curl --fail --show-error --silent http://127.0.0.1:8000/api >/dev/null && \
             sudo -n docker image prune -f"
