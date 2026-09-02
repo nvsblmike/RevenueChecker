@@ -152,7 +152,7 @@ jobs:
 
           ssh -p "$port" \
             "${SERVER_USER}@${SERVER_HOST}" \
-            "sudo mkdir -p '$path'"
+            "sudo -n mkdir -p '$path' && sudo -n chown '$SERVER_USER' '$path'"
 
           scp -P "$port" \
             deploy/docker-compose.yml \
@@ -162,9 +162,10 @@ jobs:
             .deploy-runtime/.env \
             "${SERVER_USER}@${SERVER_HOST}:${path}/.env.deploy"
 
-          sudo rm -rf .deploy-runtime
+          rm -rf .deploy-runtime
 
       - name: Deploy and verify
+        shell: bash
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
@@ -173,14 +174,16 @@ jobs:
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
         run: |
+          set -Eeuo pipefail
+
           port="${SERVER_SSH_PORT:-22}"
           path="${DEPLOY_PATH:-/opt/revenuecheck}"
           printf '%s' "$GHCR_PAT" | ssh -p "$port" "$SERVER_USER@$SERVER_HOST" \
-            "docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin"
+            "sudo -n docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin"
           ssh -p "$port" "$SERVER_USER@$SERVER_HOST" "cd '$path' && \
-            chmod 600 .env.deploy && mv .env.deploy .env && \
-            docker compose config --quiet && \
-            docker compose pull && \
-            docker compose up -d --remove-orphans && \
+            sudo -n chmod 600 .env.deploy && sudo -n mv .env.deploy .env && \
+            sudo -n docker compose config --quiet && \
+            sudo -n docker compose pull && \
+            sudo -n docker compose up -d --remove-orphans && \
             timeout 180 sh -c 'until curl --fail --silent http://127.0.0.1:3000/ >/dev/null && curl --fail --silent http://127.0.0.1:8000/api >/dev/null; do sleep 5; done' && \
-            docker image prune -f"
+            sudo -n docker image prune -f"
