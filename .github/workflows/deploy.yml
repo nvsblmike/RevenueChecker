@@ -1,0 +1,154 @@
+name: Test, build and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: revenuecheck-production
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/revenuecheck
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit --pretty false
+      - run: pip install --requirement api/requirements.txt
+      - run: python -m compileall -q api
+
+  build:
+    needs: test
+    runs-on: ubuntu-24.04
+    outputs:
+      image: ${{ steps.image.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: image
+        run: echo "ref=${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ steps.image.outputs.ref }}
+            ${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${SERVER_SSH_PORT:-22}" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Create protected runtime environment
+        env:
+          APP_IMAGE: ${{ needs.build.outputs.image }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_JWKS_URL: ${{ secrets.CLERK_JWKS_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          REPORT_RECIPIENT_EMAIL: ${{ secrets.REPORT_RECIPIENT_EMAIL }}
+          NEXT_PUBLIC_BOOKING_URL: ${{ secrets.NEXT_PUBLIC_BOOKING_URL }}
+        run: |
+          umask 077
+          mkdir -p .deploy-runtime
+          {
+            printf 'APP_IMAGE=%s\n' "$APP_IMAGE"
+            printf 'FRONTEND_BIND_ADDRESS=127.0.0.1\nFRONTEND_PORT=3000\n'
+            printf 'BACKEND_BIND_ADDRESS=127.0.0.1\nBACKEND_PORT=8000\n'
+            printf 'POSTGRES_DB=%s\n' "$POSTGRES_DB"
+            printf 'POSTGRES_USER=%s\n' "$POSTGRES_USER"
+            printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
+            printf 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=%s\n' "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+            printf 'CLERK_SECRET_KEY=%s\n' "$CLERK_SECRET_KEY"
+            printf 'CLERK_JWKS_URL=%s\n' "$CLERK_JWKS_URL"
+            printf 'OPENAI_API_KEY=%s\n' "$OPENAI_API_KEY"
+            printf 'OPENAI_MODEL=%s\n' "${OPENAI_MODEL:-gpt-5-mini}"
+            printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY"
+            printf 'RESEND_FROM_EMAIL=%s\n' "$RESEND_FROM_EMAIL"
+            printf 'REPORT_RECIPIENT_EMAIL=%s\n' "${REPORT_RECIPIENT_EMAIL:-alesemichael641@gmail.com}"
+            printf 'NEXT_PUBLIC_BOOKING_URL=%s\n' "$NEXT_PUBLIC_BOOKING_URL"
+          } > .deploy-runtime/.env
+
+      - name: Transfer deployment files
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          port="${SERVER_SSH_PORT:-22}"
+          path="${DEPLOY_PATH:-/opt/revenuecheck}"
+          ssh -p "$port" "$SERVER_USER@$SERVER_HOST" "mkdir -p '$path'"
+          scp -P "$port" deploy/docker-compose.yml "$SERVER_USER@$SERVER_HOST:$path/docker-compose.yml"
+          scp -P "$port" .deploy-runtime/.env "$SERVER_USER@$SERVER_HOST:$path/.env.deploy"
+          rm -rf .deploy-runtime
+
+      - name: Deploy and verify
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+        run: |
+          port="${SERVER_SSH_PORT:-22}"
+          path="${DEPLOY_PATH:-/opt/revenuecheck}"
+          printf '%s' "$GHCR_PAT" | ssh -p "$port" "$SERVER_USER@$SERVER_HOST" \
+            "docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin"
+          ssh -p "$port" "$SERVER_USER@$SERVER_HOST" "cd '$path' && \
+            chmod 600 .env.deploy && mv .env.deploy .env && \
+            docker compose config --quiet && \
+            docker compose pull && \
+            docker compose up -d --remove-orphans && \
+            timeout 180 sh -c 'until curl --fail --silent http://127.0.0.1:3000/ >/dev/null && curl --fail --silent http://127.0.0.1:8000/api >/dev/null; do sleep 5; done' && \
+            docker image prune -f"
